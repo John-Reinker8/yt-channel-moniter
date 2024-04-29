@@ -1,6 +1,38 @@
 import os
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
+import pandas as pd
+
+
+def process_csvs(folder_path):
+    school_tuples = []
+    count = 0
+    for file in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, file)
+
+        if file_path.endswith('.csv'):
+            df = pd.read_csv(file_path)
+
+            if 'Listing Title' in df.columns and 'Listing State' in df.columns:
+                for _, row in df.iterrows():
+                    school_name = row['Listing Title']
+                    state = row['Listing State']
+                    school_tuples.append((school_name, state))
+
+                count += 1
+
+            else:
+                print('error1')
+        
+        else:
+           print('error1')
+
+    print(f'Files processed: {count}')
+    print(school_tuples[0])  
+    print(school_tuples[-1])    
+    return school_tuples
+
+
 
 
 
@@ -27,8 +59,14 @@ def search_for_channel(yt, school_name, state):
 
 
 def main():
+    folder_path = '/Users/johnreinker/Desktop/dados'
+    school_tuples = process_csvs(folder_path)
+
+
+main()
+'''
     load_dotenv()
     API_KEY = os.getenv('API_KEY')
-
     yt = build('youtube', 'v3', developerKey=API_KEY)
+'''
 
