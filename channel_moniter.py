@@ -80,8 +80,8 @@ def main():
 
     yt = build('youtube', 'v3', developerKey=API_KEY)
 
-   ## channel_url = 'https://www.youtube.com/channel/UCdeiHp5tOM5uqMu6bejaRng'
-    channel_url = 'https://www.youtube.com/user/STLAbbey'
+    channel_url = ''
+    
  
     code, is_username = parse_URL(channel_url)
 
