@@ -10,7 +10,7 @@ import os
 import pandas as pd
 from fake_useragent import UserAgent
 
-
+## extracts roughly 118k school and state pairs from dados2 file
 def process_csvs(folder_path):
     count = 0
     school_tuples = []
@@ -40,12 +40,14 @@ def process_csvs(folder_path):
            print('Error with finding .csv file')
 
     print (len(school_tuples))
+    ## saves the 118k tuples to a csv file so we don't have to rerun this whole function
     df_tuples = pd.DataFrame(school_tuples, columns=['School Name', 'State'])
     df_tuples.to_csv('school_tuples.csv', index=False)
 
     return school_tuples
 
-def load_school_tuples(file_path):
+## loads the .csv file created by the process_csvs function, if it exists
+def load_school_tuples(file_path='school_tuples.csv'): 
     if os.path.exists(file_path):
         df = pd.read_csv(file_path)
         school_tuples = list(df.itertuples(index=False, name=None))
@@ -54,35 +56,32 @@ def load_school_tuples(file_path):
         print(f"No saved school tuples found at {file_path}")
         return None
 
+## uses a webdriver and the list of school, state pairs to obtain the school website links
+def get_school_links(school_tuples, saved_links):
 
-
-def get_school_links(school_tuples):
-    ua = UserAgent()
-    user_agent = ua.random
-    options = webdriver.ChromeOptions()
-    options.add_argument(f'user-agent={user_agent}')
-    ## options.add_argument('--headless')
-  
-
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-
-
-    school_links = []
+    new_links = []
     count = 0
     errors = 0
+    driver = wbdvr_maker()
 
-    for tuple in school_tuples:
-        school_name, state = tuple
+    for school_name, state in school_tuples:
+
+        if school_name in saved_links:
+            continue
+        
 
         q = f"{school_name} {state} website"
         url = f"https://www.google.com/search?q={q.replace(' ', '+')}"
+        print(f"Following link: {url}")
         driver.get(url)
 
         try:
             wait = WebDriverWait(driver, 10)
             results = wait.until(EC.presence_of_all_elements_located((By.XPATH, '//div[@class="yuRUbf"]//a')))
             result = results[0]
-            school_links.append(result.get_attribute('href'))
+            school_link = result.get_attribute('href')
+            new_links.append((school_name, school_link))
+            saved_links[school_name] = school_link
             count += 1
         
         except Exception as e:
@@ -90,27 +89,60 @@ def get_school_links(school_tuples):
             errors += 1
             continue
 
-        time.sleep(random.uniform(1, 5))
+        save_school_links(new_links)
+        time.sleep(random.uniform(5, 8))
 
     driver.quit()
     print(f"Number of links: {count}")
     print(f"Number of errors: {errors}")
 
-    return school_links
+
+    return new_links
+
+## makes new webdriver to avoid captcha
+def wbdvr_maker():
+    ua = UserAgent()
+    user_agent = ua.random
+    options = webdriver.ChromeOptions()
+    options.add_argument(f'user-agent={user_agent}')
+    ## options.add_argument('--headless')
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    return driver
+     
+## iteratively saves the school links to the school links csv file as the code works
+def save_school_links(school_links, file_path='school_links.csv'):
+    df_links = pd.DataFrame(school_links, columns=['School Name', 'School Link'])
+    if os.path.exists(file_path):
+        df_existing = pd.read_csv(file_path)
+        df_links = pd.concat([df_existing, df_links]).drop_duplicates(subset=['School Name']).reset_index(drop=True)
+    df_links.to_csv(file_path, index=False)
+
+
+## loads the csv file created by the get_school_links function, if it exists
+def load_school_links(file_path='school_links.csv'): 
+    if os.path.exists(file_path):
+        df = pd.read_csv(file_path)
+        saved_links = {row['School Name']: row['School Link'] for _, row in df.iterrows()}
+        return saved_links
+    else:
+        print(f"No saved school links found at {file_path}")
+        return {}
 
 
 def main():
     
+    ## where the dados2 file is located on the machine
     folder_path = '/Users/johnreinker/Desktop/dados2'
-    tuples_path = 'school_tuples.csv'
 
-    school_tuples = load_school_tuples(tuples_path)
+    ## checks for school tuple csv, if it does not exist, calls process_csvs
+    school_tuples = load_school_tuples()
     if school_tuples is None:
         school_tuples = process_csvs(folder_path)
     
-    school_links = get_school_links(school_tuples)
-
-    print (school_links)
+    ## school_tuples = [('Saint Louis Priory School', 'Missouri'), ('St. Ignatius College Preparatory', 'California'), ('Crespi Carmelite', 'California')]
+    ## checks for school links csv, if it does not exist, calls get_school_links
+    saved_links = load_school_links()
+    new_links = get_school_links(school_tuples, saved_links)
 
 
 if __name__ == "__main__":
