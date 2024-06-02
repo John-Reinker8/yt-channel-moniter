@@ -39,7 +39,7 @@ def process_csvs(folder_path):
         else:
            print('Error with finding .csv file')
 
-    print (len(school_tuples))
+    print(len(school_tuples))
     ## saves the 118k tuples to a csv file so we don't have to rerun this whole function
     df_tuples = pd.DataFrame(school_tuples, columns=['School Name', 'State'])
     df_tuples.to_csv('school_tuples.csv', index=False)
@@ -75,7 +75,11 @@ def get_school_links(school_tuples, saved_links):
         print(f"Following link: {url}")
         driver.get(url)
 
+        if check_for_captcha(driver) == True:
+            time.sleep(30)
+
         try:
+            random_scroll(driver)
             wait = WebDriverWait(driver, 10)
             results = wait.until(EC.presence_of_all_elements_located((By.XPATH, '//div[@class="yuRUbf"]//a')))
             result = results[0]
@@ -90,7 +94,7 @@ def get_school_links(school_tuples, saved_links):
             continue
 
         save_school_links(new_links)
-        time.sleep(random.uniform(5, 8))
+        time.sleep(random.uniform(5, 6))
 
     driver.quit()
     print(f"Number of links: {count}")
@@ -105,10 +109,24 @@ def wbdvr_maker():
     user_agent = ua.random
     options = webdriver.ChromeOptions()
     options.add_argument(f'user-agent={user_agent}')
-    ## options.add_argument('--headless')
+  ##  options.add_argument('--headless')
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     return driver
      
+def random_scroll(driver):
+    for _ in range(random.randint(3, 7)):
+        scroll_height = random.randint(100, 500)
+        driver.execute_script(f"window.scrollBy(0, {scroll_height});")
+        time.sleep(random.uniform(0.5, 1.5))
+
+def check_for_captcha(driver):
+    current_url = driver.current_url
+    if "sorry/index?continue" in current_url:
+        print(f"Captcha encountered")
+        return True
+    else:
+        return False
+
 ## iteratively saves the school links to the school links csv file as the code works
 def save_school_links(school_links, file_path='school_links.csv'):
     df_links = pd.DataFrame(school_links, columns=['School Name', 'School Link'])
