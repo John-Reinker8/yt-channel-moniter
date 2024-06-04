@@ -6,6 +6,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.action_chains import ActionChains
 import os
 import pandas as pd
 from fake_useragent import UserAgent
@@ -79,6 +80,7 @@ def get_school_links(school_tuples, saved_links):
             time.sleep(30)
 
         try:
+            random_mouse_movements(driver)
             random_scroll(driver)
             wait = WebDriverWait(driver, 10)
             results = wait.until(EC.presence_of_all_elements_located((By.XPATH, '//div[@class="yuRUbf"]//a')))
@@ -94,7 +96,7 @@ def get_school_links(school_tuples, saved_links):
             continue
 
         save_school_links(new_links)
-        time.sleep(random.uniform(5, 6))
+        time.sleep(random.uniform(8, 10))
 
     driver.quit()
     print(f"Number of links: {count}")
@@ -118,6 +120,29 @@ def random_scroll(driver):
         scroll_height = random.randint(100, 500)
         driver.execute_script(f"window.scrollBy(0, {scroll_height});")
         time.sleep(random.uniform(0.5, 1.5))
+
+def random_mouse_movements(driver):
+    action = ActionChains(driver)
+    window_size = driver.get_window_size()
+    window_width = window_size['width']
+    window_height = window_size['height']
+
+    for _ in range(random.randint(5, 10)):
+        x_offset = random.randint(0, window_width // 2)
+        y_offset = random.randint(0, window_height // 2)
+        x_direction = random.choice([-1, 1])
+        y_direction = random.choice([-1, 1])
+
+        x_offset *= x_direction
+        y_offset *= y_direction
+
+        # Ensure the target is within bounds
+        target_x = max(0, min(window_width, x_offset))
+        target_y = max(0, min(window_height, y_offset))
+
+        action.move_by_offset(target_x, target_y).perform()
+        time.sleep(random.uniform(0.1, 0.5))
+        action.move_by_offset(-target_x, -target_y).perform() 
 
 def check_for_captcha(driver):
     current_url = driver.current_url
