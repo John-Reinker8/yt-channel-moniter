@@ -6,10 +6,28 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.proxy import Proxy, ProxyType
 from selenium.webdriver.common.action_chains import ActionChains
 import os
 import pandas as pd
 from fake_useragent import UserAgent
+from dotenv import load_dotenv
+
+## load variables from .env
+load_dotenv()
+BRIGHTDATA_PROXY_USER = os.getenv('BRIGHTDATA_PROXY_USER')
+BRIGHTDATA_PROXY_PASSWORD = os.getenv('BRIGHTDATA_PROXY_PASSWORD')
+BRIGHTDATA_PROXY_ADDRESS = os.getenv('BRIGHTDATA_PROXY_ADDRESS')
+
+## Used to configure proxies from BrightData
+def get_proxy_options():
+    proxy_options = {
+        'proxyType': ProxyType.MANUAL,
+        'httpProxy': f'http://{BRIGHTDATA_PROXY_USER}:{BRIGHTDATA_PROXY_PASSWORD}@{BRIGHTDATA_PROXY_ADDRESS}',
+        'sslProxy': f'http://{BRIGHTDATA_PROXY_USER}:{BRIGHTDATA_PROXY_PASSWORD}@{BRIGHTDATA_PROXY_ADDRESS}',
+    }
+    return proxy_options
+
 
 ## extracts roughly 118k school and state pairs from dados2 file
 def process_csvs(folder_path):
@@ -62,12 +80,17 @@ def get_school_links(school_tuples, saved_links):
 
     new_links = []
     driver = wbdvr_maker()
+    i = 0
 
     for school_name, state in school_tuples:
 
         if school_name in saved_links:
             continue
         
+        if i >= 6:
+            i = 0
+            driver.quit()
+            driver = wbdvr_maker()
 
         q = f"{school_name} {state} website"
         url = f"https://www.google.com/search?q={q.replace(' ', '+')}"
@@ -86,13 +109,16 @@ def get_school_links(school_tuples, saved_links):
             school_link = result.get_attribute('href')
             new_links.append((school_name, school_link))
             saved_links[school_name] = school_link
+            i += 1
         
         except Exception as e:
             print(f"Error for {school_name} {state}: {e}")
+            i += 1
             continue
 
+
         save_school_links(new_links)
-        time.sleep(random.uniform(8, 10))
+        time.sleep(5)
 
     driver.quit()
     return new_links
@@ -104,6 +130,11 @@ def wbdvr_maker():
     options = webdriver.ChromeOptions()
     options.add_argument(f'user-agent={user_agent}')
   ##  options.add_argument('--headless')
+    proxy_options = get_proxy_options()
+    proxy = Proxy(proxy_options)
+    options.Proxy = proxy
+    options.add_arguement('--proxy-server=%s' % proxy_options['httpProxy'])
+
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     return driver
      
