@@ -61,8 +61,6 @@ def load_school_tuples(file_path='school_tuples.csv'):
 def get_school_links(school_tuples, saved_links):
 
     new_links = []
-    count = 0
-    errors = 0
     driver = wbdvr_maker()
 
     for school_name, state in school_tuples:
@@ -88,21 +86,15 @@ def get_school_links(school_tuples, saved_links):
             school_link = result.get_attribute('href')
             new_links.append((school_name, school_link))
             saved_links[school_name] = school_link
-            count += 1
         
         except Exception as e:
             print(f"Error for {school_name} {state}: {e}")
-            errors += 1
             continue
 
         save_school_links(new_links)
         time.sleep(random.uniform(8, 10))
 
     driver.quit()
-    print(f"Number of links: {count}")
-    print(f"Number of errors: {errors}")
-
-
     return new_links
 
 ## makes new webdriver to avoid captcha
