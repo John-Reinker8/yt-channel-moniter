@@ -15,16 +15,17 @@ from dotenv import load_dotenv
 
 ## load variables from .env
 load_dotenv()
-BRIGHTDATA_PROXY_USER = os.getenv('BRIGHTDATA_PROXY_USER')
-BRIGHTDATA_PROXY_PASSWORD = os.getenv('BRIGHTDATA_PROXY_PASSWORD')
-BRIGHTDATA_PROXY_ADDRESS = os.getenv('BRIGHTDATA_PROXY_ADDRESS')
+username = os.getenv('BRIGHTDATA_PROXY_USER')
+password = os.getenv('BRIGHTDATA_PROXY_PASSWORD')
+host = 'brd.superproxy.io'
+port = 22225
 
 ## Used to configure proxies from BrightData
 def get_proxy_options():
     proxy_options = {
         'proxyType': ProxyType.MANUAL,
-        'httpProxy': f'http://{BRIGHTDATA_PROXY_USER}:{BRIGHTDATA_PROXY_PASSWORD}@{BRIGHTDATA_PROXY_ADDRESS}',
-        'sslProxy': f'http://{BRIGHTDATA_PROXY_USER}:{BRIGHTDATA_PROXY_PASSWORD}@{BRIGHTDATA_PROXY_ADDRESS}',
+        'httpProxy': f'http://{username}:{password}@{host}:{port}',
+        'sslProxy': f'http://{username}:{password}@{host}:{port}',
     }
     return proxy_options
 
@@ -129,13 +130,18 @@ def wbdvr_maker():
     user_agent = ua.random
     options = webdriver.ChromeOptions()
     options.add_argument(f'user-agent={user_agent}')
-  ##  options.add_argument('--headless')
+    # options.add_argument('--headless')
     proxy_options = get_proxy_options()
+    # Log proxy options
+    print(f"Using proxy options: {proxy_options}")
     proxy = Proxy(proxy_options)
     options.Proxy = proxy
-    options.add_arguement('--proxy-server=%s' % proxy_options['httpProxy'])
-
+    options.add_argument('--proxy-server=%s' % proxy_options['httpProxy'])
+    # Log proxy server
+    print(f"Proxy server set to: {proxy_options['httpProxy']}") 
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+
     return driver
      
 def random_scroll(driver):
