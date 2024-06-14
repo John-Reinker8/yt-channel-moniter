@@ -13,19 +13,22 @@ import pandas as pd
 from fake_useragent import UserAgent
 from dotenv import load_dotenv
 
+"""
 ## load variables from .env
 load_dotenv()
 username = os.getenv('BRIGHTDATA_PROXY_USER')
 password = os.getenv('BRIGHTDATA_PROXY_PASSWORD')
 host = 'brd.superproxy.io'
 port = 22225
+"""
 
 ## Used to configure proxies from BrightData
 def get_proxy_options():
     proxy_options = {
+        
         'proxyType': ProxyType.MANUAL,
-        'httpProxy': f'http://{username}:{password}@{host}:{port}',
-        'sslProxy': f'http://{username}:{password}@{host}:{port}',
+        'httpProxy': 'http://127.0.0.1:24000',
+        'sslProxy': 'http://127.0.0.1:24000'
     }
     return proxy_options
 
@@ -135,8 +138,11 @@ def wbdvr_maker():
     # Log proxy options
     print(f"Using proxy options: {proxy_options}")
     proxy = Proxy(proxy_options)
+    proxy.proxy_type = ProxyType.MANUAL
+    proxy.http_proxy = proxy_options['httpProxy']
+    proxy.ssl_proxy = proxy_options['sslProxy']
     options.Proxy = proxy
-    options.add_argument('--proxy-server=%s' % proxy_options['httpProxy'])
+    options.add_argument('--proxy-server=%s' % proxy.http_proxy)
     # Log proxy server
     print(f"Proxy server set to: {proxy_options['httpProxy']}") 
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
