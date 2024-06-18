@@ -91,10 +91,6 @@ def get_school_links(school_tuples, saved_links):
         if school_name in saved_links:
             continue
         
-        if i >= 6:
-            i = 0
-            driver.quit()
-            driver = wbdvr_maker()
 
         q = f"{school_name} {state} website"
         url = f"https://www.google.com/search?q={q.replace(' ', '+')}"
@@ -122,7 +118,7 @@ def get_school_links(school_tuples, saved_links):
 
 
         save_school_links(new_links)
-        time.sleep(5)
+       # time.sleep(40)
 
     driver.quit()
     return new_links
@@ -134,6 +130,7 @@ def wbdvr_maker():
     options = webdriver.ChromeOptions()
     options.add_argument(f'user-agent={user_agent}')
     # options.add_argument('--headless')
+    '''
     proxy_options = get_proxy_options()
     # Log proxy options
     print(f"Using proxy options: {proxy_options}")
@@ -145,8 +142,9 @@ def wbdvr_maker():
     options.add_argument('--proxy-server=%s' % proxy.http_proxy)
     # Log proxy server
     print(f"Proxy server set to: {proxy_options['httpProxy']}") 
+    '''
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+   # driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
     return driver
      
