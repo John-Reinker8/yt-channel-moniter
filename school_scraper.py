@@ -12,8 +12,7 @@ import os
 import pandas as pd
 from fake_useragent import UserAgent
 from dotenv import load_dotenv
-import threading
-import concurrent.futures
+
 
 
 ## extracts roughly 118k school and state pairs from dados2 file
@@ -81,7 +80,7 @@ def get_school_links(school_tuples, saved_links):
         driver.get(url)
 
         if check_for_captcha(driver) == True:
-            time.sleep(40)
+            time.sleep(30)
 
         try:
             wait = WebDriverWait(driver, 10)
