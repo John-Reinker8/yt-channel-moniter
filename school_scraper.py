@@ -12,25 +12,8 @@ import os
 import pandas as pd
 from fake_useragent import UserAgent
 from dotenv import load_dotenv
-
-"""
-## load variables from .env
-load_dotenv()
-username = os.getenv('BRIGHTDATA_PROXY_USER')
-password = os.getenv('BRIGHTDATA_PROXY_PASSWORD')
-host = 'brd.superproxy.io'
-port = 22225
-"""
-
-## Used to configure proxies from BrightData
-def get_proxy_options():
-    proxy_options = {
-        
-        'proxyType': ProxyType.MANUAL,
-        'httpProxy': 'http://127.0.0.1:24000',
-        'sslProxy': 'http://127.0.0.1:24000'
-    }
-    return proxy_options
+import threading
+import concurrent.futures
 
 
 ## extracts roughly 118k school and state pairs from dados2 file
@@ -98,11 +81,9 @@ def get_school_links(school_tuples, saved_links):
         driver.get(url)
 
         if check_for_captcha(driver) == True:
-            time.sleep(30)
+            time.sleep(40)
 
         try:
-            random_mouse_movements(driver)
-            random_scroll(driver)
             wait = WebDriverWait(driver, 10)
             results = wait.until(EC.presence_of_all_elements_located((By.XPATH, '//div[@class="yuRUbf"]//a')))
             result = results[0]
@@ -130,52 +111,8 @@ def wbdvr_maker():
     options = webdriver.ChromeOptions()
     options.add_argument(f'user-agent={user_agent}')
     # options.add_argument('--headless')
-    '''
-    proxy_options = get_proxy_options()
-    # Log proxy options
-    print(f"Using proxy options: {proxy_options}")
-    proxy = Proxy(proxy_options)
-    proxy.proxy_type = ProxyType.MANUAL
-    proxy.http_proxy = proxy_options['httpProxy']
-    proxy.ssl_proxy = proxy_options['sslProxy']
-    options.Proxy = proxy
-    options.add_argument('--proxy-server=%s' % proxy.http_proxy)
-    # Log proxy server
-    print(f"Proxy server set to: {proxy_options['httpProxy']}") 
-    '''
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-   # driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-
     return driver
-     
-def random_scroll(driver):
-    for _ in range(random.randint(3, 7)):
-        scroll_height = random.randint(100, 500)
-        driver.execute_script(f"window.scrollBy(0, {scroll_height});")
-        time.sleep(random.uniform(0.5, 1.5))
-
-def random_mouse_movements(driver):
-    action = ActionChains(driver)
-    window_size = driver.get_window_size()
-    window_width = window_size['width']
-    window_height = window_size['height']
-
-    for _ in range(random.randint(5, 10)):
-        x_offset = random.randint(0, window_width // 2)
-        y_offset = random.randint(0, window_height // 2)
-        x_direction = random.choice([-1, 1])
-        y_direction = random.choice([-1, 1])
-
-        x_offset *= x_direction
-        y_offset *= y_direction
-
-        # Ensure the target is within bounds
-        target_x = max(0, min(window_width, x_offset))
-        target_y = max(0, min(window_height, y_offset))
-
-        action.move_by_offset(target_x, target_y).perform()
-        time.sleep(random.uniform(0.1, 0.5))
-        action.move_by_offset(-target_x, -target_y).perform() 
 
 def check_for_captcha(driver):
     current_url = driver.current_url
