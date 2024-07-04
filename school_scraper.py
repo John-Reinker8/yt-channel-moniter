@@ -14,13 +14,14 @@ from fake_useragent import UserAgent
 from dotenv import load_dotenv
 import threading
 import concurrent.futures
+from collections import deque
 
 lock = threading.Lock()
 
 ## extracts roughly 118k school and state pairs from dados2 file
 def process_csvs(folder_path):
     count = 0
-    school_tuples = []
+    school_tuples = deque()
     seen_tuples = set()
     for file in os.listdir(folder_path):
         file_path = os.path.join(folder_path, file)
@@ -57,7 +58,7 @@ def process_csvs(folder_path):
 def load_school_tuples(file_path='school_tuples.csv'): 
     if os.path.exists(file_path):
         df = pd.read_csv(file_path)
-        school_tuples = list(df.itertuples(index=False, name=None))
+        school_tuples = deque(df.itertuples(index=False, name=None))
         return school_tuples
     else:
         print(f"No saved school tuples found at {file_path}")
@@ -66,43 +67,46 @@ def load_school_tuples(file_path='school_tuples.csv'):
 ## uses a webdriver and the list of school, state pairs to obtain the school website links
 def get_school_links(school_tuples, saved_links, result_queue, position):
     driver = wbdvr_maker(position)
-    
+
+
     while school_tuples:
         with lock:
             if not school_tuples:
                 break
-            school_tuple = school_tuples.pop(0)
+            school_tuple = school_tuples.popleft()
 
-    school_name, state = school_tuple
-  
-    with lock:
-        if school_name in saved_links:
-            return
-
-    print(f"Thread {threading.current_thread().name} is working on {school_tuple}")
-
-  
-
-    q = f"{school_name} {state} website"
-    url = f"https://www.google.com/search?q={q.replace(' ', '+')}"
-    print(f"Following link: {url}")
-    driver.get(url)
-
-    if check_for_captcha(driver):
-        time.sleep(30)
-
-    try:
-        wait = WebDriverWait(driver, 10)
-        results = wait.until(EC.presence_of_all_elements_located((By.XPATH, '//div[@class="yuRUbf"]//a')))
-        result = results[0]
-        school_link = result.get_attribute('href')
-
+        school_name, state = school_tuple
+        print(f"Thread {threading.current_thread().name} is working on {school_tuple}")
+        
         with lock:
-            result_queue.append((school_name, school_link))
-            saved_links[school_name] = school_link
-    
-    except Exception as e:
-        print(f"Error for {school_name} {state}: {e}")
+                if school_name in saved_links:
+                    continue
+
+   
+
+  
+
+        q = f"{school_name} {state} website"
+        url = f"https://www.google.com/search?q={q.replace(' ', '+')}"
+        print(f"Following link: {url}")
+        driver.get(url)
+
+        if check_for_captcha(driver):
+            time.sleep(30)
+
+        try:
+            wait = WebDriverWait(driver, 10)
+            results = wait.until(EC.presence_of_all_elements_located((By.XPATH, '//div[@class="yuRUbf"]//a')))
+            result = results[0]
+            school_link = result.get_attribute('href')
+
+            with lock:
+                result_queue.append((school_name, school_link))
+                save_school_links(result_queue)
+                saved_links[school_name] = school_link
+        
+        except Exception as e:
+            print(f"Error for {school_name} {state}: {e}")
         
      
 
@@ -176,9 +180,9 @@ def main():
             except Exception as e:
                 print(f"Exception: {e}")
 
-    save_school_links(result_queue)
+    
 
-    new_links = get_school_links(school_tuples, saved_links)
+  #  new_links = get_school_links(school_tuples, saved_links, result_queue)
 
 
 if __name__ == "__main__":
