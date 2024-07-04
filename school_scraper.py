@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 import threading
 import concurrent.futures
 
-
+lock = threading.Lock()
 
 ## extracts roughly 118k school and state pairs from dados2 file
 def process_csvs(folder_path):
@@ -64,54 +64,59 @@ def load_school_tuples(file_path='school_tuples.csv'):
         return None
 
 ## uses a webdriver and the list of school, state pairs to obtain the school website links
-def get_school_links(school_tuples, saved_links):
+def get_school_links(school_tuples, saved_links, result_queue, position):
+    driver = wbdvr_maker(position)
+    
+    while school_tuples:
+        with lock:
+            if not school_tuples:
+                break
+            school_tuple = school_tuples.pop(0)
 
-    new_links = []
-    driver = wbdvr_maker()
-    i = 0
-
-    for school_name, state in school_tuples:
-
+    school_name, state = school_tuple
+  
+    with lock:
         if school_name in saved_links:
-            continue
-        
+            return
 
-        q = f"{school_name} {state} website"
-        url = f"https://www.google.com/search?q={q.replace(' ', '+')}"
-        print(f"Following link: {url}")
-        driver.get(url)
+    print(f"Thread {threading.current_thread().name} is working on {school_tuple}")
 
-        if check_for_captcha(driver) == True:
-            time.sleep(30)
+  
 
-        try:
-            wait = WebDriverWait(driver, 10)
-            results = wait.until(EC.presence_of_all_elements_located((By.XPATH, '//div[@class="yuRUbf"]//a')))
-            result = results[0]
-            school_link = result.get_attribute('href')
-            new_links.append((school_name, school_link))
+    q = f"{school_name} {state} website"
+    url = f"https://www.google.com/search?q={q.replace(' ', '+')}"
+    print(f"Following link: {url}")
+    driver.get(url)
+
+    if check_for_captcha(driver):
+        time.sleep(30)
+
+    try:
+        wait = WebDriverWait(driver, 10)
+        results = wait.until(EC.presence_of_all_elements_located((By.XPATH, '//div[@class="yuRUbf"]//a')))
+        result = results[0]
+        school_link = result.get_attribute('href')
+
+        with lock:
+            result_queue.append((school_name, school_link))
             saved_links[school_name] = school_link
-            i += 1
+    
+    except Exception as e:
+        print(f"Error for {school_name} {state}: {e}")
         
-        except Exception as e:
-            print(f"Error for {school_name} {state}: {e}")
-            i += 1
-            continue
-
-
-        save_school_links(new_links)
-       # time.sleep(40)
+     
 
     driver.quit()
-    return new_links
+ 
 
 ## makes new webdriver to avoid captcha
-def wbdvr_maker():
+def wbdvr_maker(position):
     ua = UserAgent()
     user_agent = ua.random
     options = webdriver.ChromeOptions()
     options.add_argument(f'user-agent={user_agent}')
     # options.add_argument('--headless')
+    options.add_argument(f'--window-position={position[0]},{position[1]}')
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     return driver
 
@@ -156,6 +161,23 @@ def main():
     ## school_tuples = [('Saint Louis Priory School', 'Missouri'), ('St. Ignatius College Preparatory', 'California'), ('Crespi Carmelite', 'California')]
     ## checks for school links csv, if it does not exist, calls get_school_links
     saved_links = load_school_links()
+    result_queue = []
+    positions = [(0,0), (800,0)]
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(get_school_links, school_tuples, saved_links, result_queue, positions[i])
+            for i in range(2)
+        ]
+
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                future.result()
+            except Exception as e:
+                print(f"Exception: {e}")
+
+    save_school_links(result_queue)
+
     new_links = get_school_links(school_tuples, saved_links)
 
 
