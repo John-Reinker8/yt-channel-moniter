@@ -92,7 +92,7 @@ def get_school_links(school_tuples, saved_links, result_queue, position):
         driver.get(url)
 
         if check_for_captcha(driver):
-            time.sleep(30)
+            time.sleep(60)
 
         try:
             wait = WebDriverWait(driver, 10)
@@ -114,13 +114,14 @@ def get_school_links(school_tuples, saved_links, result_queue, position):
  
 
 ## makes new webdriver to avoid captcha
-def wbdvr_maker(position):
+def wbdvr_maker(position, size=(800, 600)):
     ua = UserAgent()
     user_agent = ua.random
     options = webdriver.ChromeOptions()
     options.add_argument(f'user-agent={user_agent}')
     # options.add_argument('--headless')
     options.add_argument(f'--window-position={position[0]},{position[1]}')
+    options.add_argument(f'--window-size={size[0]},{size[1]}')
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     return driver
 
@@ -166,12 +167,12 @@ def main():
     ## checks for school links csv, if it does not exist, calls get_school_links
     saved_links = load_school_links()
     result_queue = []
-    positions = [(0,0), (800,0)]
+    positions = [(0,0), (800,0),(0,600), (800,600) ]
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         futures = [
             executor.submit(get_school_links, school_tuples, saved_links, result_queue, positions[i])
-            for i in range(2)
+            for i in range(4)
         ]
 
         for future in concurrent.futures.as_completed(futures):
