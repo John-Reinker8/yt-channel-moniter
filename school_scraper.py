@@ -81,7 +81,7 @@ def get_school_links(school_tuples, saved_links):
 
         if check_for_captcha(driver) == True:
             time.sleep(30)
-            print()
+            
         try:
             wait = WebDriverWait(driver, 10)
             results = wait.until(EC.presence_of_all_elements_located((By.XPATH, '//div[@class="yuRUbf"]//a')))
