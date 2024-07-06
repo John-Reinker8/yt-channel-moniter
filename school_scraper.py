@@ -1,5 +1,3 @@
-import time
-import random
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -76,15 +74,12 @@ def get_school_links(school_tuples, saved_links, result_queue, position):
             school_tuple = school_tuples.popleft()
 
         school_name, state = school_tuple
-        print(f"Thread {threading.current_thread().name} is working on {school_tuple}")
+      #  print(f"Thread {threading.current_thread().name} is working on {school_tuple}")
         
         with lock:
                 if school_name in saved_links:
                     continue
 
-   
-
-  
 
         q = f"{school_name} {state} website"
         url = f"https://www.google.com/search?q={q.replace(' ', '+')}"
@@ -92,7 +87,7 @@ def get_school_links(school_tuples, saved_links, result_queue, position):
         driver.get(url)
 
         if check_for_captcha(driver):
-            time.sleep(60)
+            input("Press Enter to continue...")
 
         try:
             wait = WebDriverWait(driver, 10)
@@ -108,8 +103,6 @@ def get_school_links(school_tuples, saved_links, result_queue, position):
         except Exception as e:
             print(f"Error for {school_name} {state}: {e}")
         
-     
-
     driver.quit()
  
 
@@ -167,12 +160,12 @@ def main():
     ## checks for school links csv, if it does not exist, calls get_school_links
     saved_links = load_school_links()
     result_queue = []
-    positions = [(0,0), (800,0),(0,600), (800,600) ]
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+    positions = [(0,0), (800,0),(0,600), (800,600)]
+    ## sets up multiple threads for parallel work
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         futures = [
             executor.submit(get_school_links, school_tuples, saved_links, result_queue, positions[i])
-            for i in range(4)
+            for i in range(2)
         ]
 
         for future in concurrent.futures.as_completed(futures):
@@ -181,10 +174,8 @@ def main():
             except Exception as e:
                 print(f"Exception: {e}")
 
-    
 
   #  new_links = get_school_links(school_tuples, saved_links, result_queue)
-
 
 if __name__ == "__main__":
     main()
