@@ -13,8 +13,11 @@ from dotenv import load_dotenv
 import threading
 import concurrent.futures
 from collections import deque
+import logging
 
 lock = threading.Lock()
+active_threads = []
+max_threads = 2
 
 ## extracts roughly 118k school and state pairs from dados2 file
 def process_csvs(folder_path):
@@ -64,46 +67,66 @@ def load_school_tuples(file_path='school_tuples.csv'):
 
 ## uses a webdriver and the list of school, state pairs to obtain the school website links
 def get_school_links(school_tuples, saved_links, result_queue, position):
-    driver = wbdvr_maker(position)
+   
+    try:
+        driver = wbdvr_maker(position)
 
 
-    while school_tuples:
-        with lock:
-            if not school_tuples:
-                break
-            school_tuple = school_tuples.popleft()
-
-        school_name, state = school_tuple
-      #  print(f"Thread {threading.current_thread().name} is working on {school_tuple}")
+        while school_tuples:
         
-        with lock:
-                if school_name in saved_links:
-                    continue
-
-
-        q = f"{school_name} {state} website"
-        url = f"https://www.google.com/search?q={q.replace(' ', '+')}"
-        print(f"Following link: {url}")
-        driver.get(url)
-
-        if check_for_captcha(driver):
-            input("Press Enter to continue...")
-
-        try:
-            wait = WebDriverWait(driver, 10)
-            results = wait.until(EC.presence_of_all_elements_located((By.XPATH, '//div[@class="yuRUbf"]//a')))
-            result = results[0]
-            school_link = result.get_attribute('href')
 
             with lock:
-                result_queue.append((school_name, school_link))
-                save_school_links(result_queue)
-                saved_links[school_name] = school_link
-        
-        except Exception as e:
-            print(f"Error for {school_name} {state}: {e}")
+                if not school_tuples:
+                    break
+                school_tuple = school_tuples.popleft()
+
+            school_name, state = school_tuple
+            
+            
+            with lock:
+                    if school_name in saved_links:
+                        continue
+
+            print(f"Thread {threading.current_thread().name} is working on {school_tuple}")
+            print(active_threads)
+            print(len(active_threads))
+            q = f"{school_name} {state} website"
+            url = f"https://www.google.com/search?q={q.replace(' ', '+')}"
+            print(f"Following link: {url}")
+            driver.get(url)
+
+            if check_for_captcha(driver):
+                input("Press Enter to continue...")
+
+            try:
+                wait = WebDriverWait(driver, 10)
+                results = wait.until(EC.presence_of_all_elements_located((By.XPATH, '//div[@class="yuRUbf"]//a')))
+                result = results[0]
+                school_link = result.get_attribute('href')
+
+                with lock:
+                    result_queue.append((school_name, school_link))
+                    save_school_links(result_queue)
+                    saved_links[school_name] = school_link
+            
+            except Exception as e:
+                print(f"Error 1st loop for {school_name} {state}: {e}")
+                with lock:
+                    active_threads.pop()
+                print(len(active_threads))
+                driver.quit()
+                return
+            
+    except Exception as e:
+        print(f"Error 2nd loop for {school_name} {state}: {e}")
+        with lock:
+            active_threads.remove()
+        print(len(active_threads))
+        driver.quit()
+        return
         
     driver.quit()
+   
  
 
 ## makes new webdriver to avoid captcha
@@ -161,19 +184,17 @@ def main():
     saved_links = load_school_links()
     result_queue = []
     positions = [(0,0), (800,0),(0,600), (800,600)]
-    ## sets up multiple threads for parallel work
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        futures = [
-            executor.submit(get_school_links, school_tuples, saved_links, result_queue, positions[i])
-            for i in range(2)
-        ]
 
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                future.result()
-            except Exception as e:
-                print(f"Exception: {e}")
-
+    ## sets up max_threads for parallel work, creates a new thread if one goes down
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
+        while school_tuples:
+            with lock:
+                if len(active_threads) < max_threads:
+                    for i in range(max_threads):
+                        if i not in active_threads:
+                            active_threads.append(i)
+                            print(f"Added {i}!")
+                            executor.submit(get_school_links, school_tuples, saved_links, result_queue, positions[i])
 
   #  new_links = get_school_links(school_tuples, saved_links, result_queue)
 
