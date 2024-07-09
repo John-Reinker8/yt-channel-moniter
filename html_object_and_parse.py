@@ -51,9 +51,12 @@ def html_parser(html_contents):
 def main():
     
     school_links = load_school_links()
-
-
-    html_contents = html_getter(school_links)
+    
+   
+    test_links = school_links[0:19]
+    print(test_links)
+    html_contents = html_getter(test_links)
+    #html_contents = html_getter(school_links)
     youtube_links = html_parser(html_contents)
     print(youtube_links)
 
