@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 import threading
 import concurrent.futures
 from collections import deque
-import logging
+import urllib.parse
 
 lock = threading.Lock()
 active_threads = []
@@ -66,7 +66,7 @@ def load_school_tuples(file_path='school_tuples.csv'):
         return None
 
 ## uses a webdriver and the list of school, state pairs to obtain the school website links
-def get_school_links(school_tuples, saved_links, result_queue, position):
+def get_school_links(school_tuples, saved_links, result_queue, position, i):
    
     try:
         driver = wbdvr_maker(position)
@@ -91,7 +91,9 @@ def get_school_links(school_tuples, saved_links, result_queue, position):
             print(active_threads)
             print(len(active_threads))
             q = f"{school_name} {state} website"
-            url = f"https://www.google.com/search?q={q.replace(' ', '+')}"
+            parsed_q = urllib.parse.quote(q)
+            url = f"https://www.google.com/search?q={parsed_q}"
+          #  url = f"https://www.google.com/search?q={q.replace(' ', '+')}"
             print(f"Following link: {url}")
             driver.get(url)
 
@@ -110,17 +112,19 @@ def get_school_links(school_tuples, saved_links, result_queue, position):
                     saved_links[school_name] = school_link
             
             except Exception as e:
-                print(f"Error 1st loop for {school_name} {state}: {e}")
+                print(f"Error 1st loop for {school_name} {state}: {i}")
                 with lock:
-                    active_threads.pop()
+                    active_threads.remove(i)
+                print(f"Removed {i}")
                 print(len(active_threads))
                 driver.quit()
                 return
             
     except Exception as e:
-        print(f"Error 2nd loop for {school_name} {state}: {e}")
+        print(f"Error 2nd loop for {school_name} {state}: {i}")
         with lock:
-            active_threads.remove()
+            active_threads.remove(i)
+        print(f"Removed {i}")
         print(len(active_threads))
         driver.quit()
         return
@@ -194,7 +198,7 @@ def main():
                         if i not in active_threads:
                             active_threads.append(i)
                             print(f"Added {i}!")
-                            executor.submit(get_school_links, school_tuples, saved_links, result_queue, positions[i])
+                            executor.submit(get_school_links, school_tuples, saved_links, result_queue, positions[i], i)
 
   #  new_links = get_school_links(school_tuples, saved_links, result_queue)
 
