@@ -4,12 +4,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.common.proxy import Proxy, ProxyType
-from selenium.webdriver.common.action_chains import ActionChains
 import os
 import pandas as pd
 from fake_useragent import UserAgent
-from dotenv import load_dotenv
 import threading
 import concurrent.futures
 from collections import deque
@@ -69,7 +66,7 @@ def load_school_tuples(file_path='school_tuples.csv'):
 def get_school_links(school_tuples, saved_links, result_queue, position, i):
    
     try:
-        driver = wbdvr_maker(position)
+        driver = wbdvr_maker(position, i)
 
 
         while school_tuples:
@@ -88,8 +85,6 @@ def get_school_links(school_tuples, saved_links, result_queue, position, i):
                         continue
 
             print(f"Thread {threading.current_thread().name} is working on {school_tuple}")
-            print(active_threads)
-            print(len(active_threads))
             q = f"{school_name} {state} website"
             parsed_q = urllib.parse.quote(q)
             url = f"https://www.google.com/search?q={parsed_q}"
@@ -116,7 +111,6 @@ def get_school_links(school_tuples, saved_links, result_queue, position, i):
                 with lock:
                     active_threads.remove(i)
                 print(f"Removed {i}")
-                print(len(active_threads))
                 driver.quit()
                 return
             
@@ -125,7 +119,6 @@ def get_school_links(school_tuples, saved_links, result_queue, position, i):
         with lock:
             active_threads.remove(i)
         print(f"Removed {i}")
-        print(len(active_threads))
         driver.quit()
         return
         
@@ -134,7 +127,7 @@ def get_school_links(school_tuples, saved_links, result_queue, position, i):
  
 
 ## makes new webdriver to avoid captcha
-def wbdvr_maker(position, size=(800, 600)):
+def wbdvr_maker(position, i,  size=(800, 600)):
     ua = UserAgent()
     user_agent = ua.random
     options = webdriver.ChromeOptions()
@@ -143,6 +136,7 @@ def wbdvr_maker(position, size=(800, 600)):
     options.add_argument(f'--window-position={position[0]},{position[1]}')
     options.add_argument(f'--window-size={size[0]},{size[1]}')
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    print(f"WD made for {i}")
     return driver
 
 def check_for_captcha(driver):
@@ -194,6 +188,7 @@ def main():
         while school_tuples:
             with lock:
                 if len(active_threads) < max_threads:
+                    print(active_threads)
                     for i in range(max_threads):
                         if i not in active_threads:
                             active_threads.append(i)
