@@ -11,6 +11,7 @@ import threading
 import concurrent.futures
 from collections import deque
 import urllib.parse
+import traceback
 
 lock = threading.Lock()
 active_threads = []
@@ -52,6 +53,7 @@ def process_csvs(folder_path):
 
     return school_tuples
 
+
 ## loads the .csv file created by the process_csvs function, if it exists
 def load_school_tuples(file_path='school_tuples.csv'): 
     if os.path.exists(file_path):
@@ -62,23 +64,20 @@ def load_school_tuples(file_path='school_tuples.csv'):
         print(f"No saved school tuples found at {file_path}")
         return None
 
+
 ## uses a webdriver and the list of school, state pairs to obtain the school website links
 def get_school_links(school_tuples, saved_links, result_queue, position, i):
-   
     try:
+        print(f"{i} has entered the function")
         driver = wbdvr_maker(position, i)
 
-
         while school_tuples:
-        
-
             with lock:
                 if not school_tuples:
                     break
                 school_tuple = school_tuples.popleft()
 
             school_name, state = school_tuple
-            
             
             with lock:
                     if school_name in saved_links:
@@ -88,12 +87,11 @@ def get_school_links(school_tuples, saved_links, result_queue, position, i):
             q = f"{school_name} {state} website"
             parsed_q = urllib.parse.quote(q)
             url = f"https://www.google.com/search?q={parsed_q}"
-          #  url = f"https://www.google.com/search?q={q.replace(' ', '+')}"
             print(f"Following link: {url}")
             driver.get(url)
 
             if check_for_captcha(driver):
-                input("Press Enter to continue...")
+                input(f"Press Enter to continue for {i}")
 
             try:
                 wait = WebDriverWait(driver, 10)
@@ -107,45 +105,48 @@ def get_school_links(school_tuples, saved_links, result_queue, position, i):
                     saved_links[school_name] = school_link
             
             except Exception as e:
-                print(f"Error 1st loop for {school_name} {state}: {i}")
-                with lock:
-                    active_threads.remove(i)
-                print(f"Removed {i}")
+                print(f"Error in inner loop for {i}: {school_name} {state} : {e}")
+                traceback.print_exc()
                 driver.quit()
-                return
+                driver = wbdvr_maker(position, i)
             
     except Exception as e:
-        print(f"Error 2nd loop for {school_name} {state}: {i}")
+        print(f"Error in outer loop for {i}: {school_name} {state} : {e}")
         with lock:
             active_threads.remove(i)
-        print(f"Removed {i}")
         driver.quit()
         return
         
     driver.quit()
    
- 
 
-## makes new webdriver to avoid captcha
+## makes webdriver
 def wbdvr_maker(position, i,  size=(800, 600)):
-    ua = UserAgent()
-    user_agent = ua.random
-    options = webdriver.ChromeOptions()
-    options.add_argument(f'user-agent={user_agent}')
-    # options.add_argument('--headless')
-    options.add_argument(f'--window-position={position[0]},{position[1]}')
-    options.add_argument(f'--window-size={size[0]},{size[1]}')
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    print(f"WD made for {i}")
-    return driver
+    try:
+        ua = UserAgent()
+        user_agent = ua.random
+        options = webdriver.ChromeOptions()
+        options.add_argument(f'user-agent={user_agent}')
+        # options.add_argument('--headless')
+        options.add_argument(f'--window-position={position[0]},{position[1]}')
+        options.add_argument(f'--window-size={size[0]},{size[1]}')
+        driver_path = '/Users/johnreinker/.wdm/drivers/chromedriver/mac64/126.0.6478.127/chromedriver-mac-x64/chromedriver'
+        if not os.path.exists(driver_path):
+            print(f"Downloading latest CD version")
+            driver_path = ChromeDriverManager().install()
+        driver = webdriver.Chrome(service=Service(driver_path), options=options)
+        return driver
+    except Exception as e:
+        print(f"Error making WD for {i}: {e}")
+
 
 def check_for_captcha(driver):
     current_url = driver.current_url
     if "sorry/index?continue" in current_url:
-        print(f"Captcha encountered")
         return True
     else:
         return False
+
 
 ## iteratively saves the school links to the school links csv file as the code works
 def save_school_links(school_links, file_path='school_links.csv'):
