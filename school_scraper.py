@@ -11,11 +11,10 @@ import threading
 import concurrent.futures
 from collections import deque
 import urllib.parse
-import traceback
 
 lock = threading.Lock()
 active_threads = []
-max_threads = 2
+max_threads = 3
 
 ## extracts roughly 118k school and state pairs from dados2 file
 def process_csvs(folder_path):
@@ -64,12 +63,20 @@ def load_school_tuples(file_path='school_tuples.csv'):
         print(f"No saved school tuples found at {file_path}")
         return None
 
+## loads the csv file created by the get_school_links function, if it exists
+def load_school_links(file_path='school_links.csv'): 
+    if os.path.exists(file_path):
+        df = pd.read_csv(file_path)
+        saved_links = {row['School Name']: row['School Link'] for _, row in df.iterrows()}
+        return saved_links
+    else:
+        print(f"No saved school links found at {file_path}")
+        return {}
 
 ## uses a webdriver and the list of school, state pairs to obtain the school website links
 def get_school_links(school_tuples, saved_links, result_queue, position, i):
     try:
         driver = wbdvr_maker(position, i)
-
         while school_tuples:
             with lock:
                 if not school_tuples:
@@ -82,15 +89,14 @@ def get_school_links(school_tuples, saved_links, result_queue, position, i):
                     if school_name in saved_links:
                         continue
 
-            print(f"Thread {threading.current_thread().name} is working on {school_tuple}")
             q = f"{school_name} {state} website"
             parsed_q = urllib.parse.quote(q)
             url = f"https://www.google.com/search?q={parsed_q}"
-            print(f"Following link: {url}")
+            print(f"Thread {threading.current_thread().name} is working on {school_tuple}. Link: {url}\n")
             driver.get(url)
 
             if check_for_captcha(driver):
-                input(f"Press Enter to continue for {i}")
+                input(f"Press Enter to continue for {i}\n")
 
             try:
                 wait = WebDriverWait(driver, 10)
@@ -113,19 +119,17 @@ def get_school_links(school_tuples, saved_links, result_queue, position, i):
             
             except Exception as e:
                 print(f"Error in inner loop for {i}: {school_name} {state} : {e}")
-                traceback.print_exc()
                 driver.quit()
                 driver = wbdvr_maker(position, i)
             
     except Exception as e:
         print(f"Error in outer loop for {i}: {school_name} {state} : {e}")
-        with lock:
-            active_threads.remove(i)
+      
         driver.quit()
         return
         
     driver.quit()
-   
+    return
 
 ## makes webdriver
 def wbdvr_maker(position, i,  size=(800, 600)):
@@ -146,14 +150,12 @@ def wbdvr_maker(position, i,  size=(800, 600)):
     except Exception as e:
         print(f"Error making WD for {i}: {e}")
 
-
 def check_for_captcha(driver):
     current_url = driver.current_url
     if "sorry/index?continue" in current_url:
         return True
     else:
         return False
-
 
 ## iteratively saves the school links to the school links csv file as the code works
 def save_school_links(school_links, file_path='school_links.csv'):
@@ -164,19 +166,7 @@ def save_school_links(school_links, file_path='school_links.csv'):
     df_links.to_csv(file_path, index=False)
 
 
-## loads the csv file created by the get_school_links function, if it exists
-def load_school_links(file_path='school_links.csv'): 
-    if os.path.exists(file_path):
-        df = pd.read_csv(file_path)
-        saved_links = {row['School Name']: row['School Link'] for _, row in df.iterrows()}
-        return saved_links
-    else:
-        print(f"No saved school links found at {file_path}")
-        return {}
-
-
 def main():
-    
     ## where the dados2 file is located on the machine
     folder_path = '/Users/johnreinker/Desktop/dados2'
 
@@ -200,10 +190,8 @@ def main():
                     for i in range(max_threads):
                         if i not in active_threads:
                             active_threads.append(i)
-                            print(f"Added {i}!")
                             executor.submit(get_school_links, school_tuples, saved_links, result_queue, positions[i], i)
-
-  #  new_links = get_school_links(school_tuples, saved_links, result_queue)
+    return
 
 if __name__ == "__main__":
     main()
