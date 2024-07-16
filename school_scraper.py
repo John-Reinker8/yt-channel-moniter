@@ -94,29 +94,22 @@ def get_school_links(school_tuples, saved_links, result_queue, position, i):
 
             try:
                 wait = WebDriverWait(driver, 10)
-                school_link = None
+                xpaths = '//div[@class="yuRUbf"]//a | //div[@class="P8ujBc v5yQqb jqWpsc"]//a'
+                
+                results = wait.until(EC.presence_of_all_elements_located((By.XPATH, xpaths)))
 
-                xpaths = [
-                    '//div[@class="yuRUbf"]//a',
-                    '//div[@class="P8ujBc v5yQqb jqWpsc"]//a'
-                ]
-
-                for xpath in xpaths:
-                    try:
-                        results = wait.until(EC.presence_of_all_elements_located((By.XPATH, xpath)))
-                        if results:
-                            result = results[0]
-                            school_link = result.get_attribute('href')
-                            break
-
-                    except Exception as e:
-                        print(f"Xpath {xpath} did not work: {e}")
-
-                if school_link:
-                    with lock:
-                        result_queue.append((school_name, school_link))
-                        save_school_links(result_queue)
-                        saved_links[school_name] = school_link
+                if results:
+                    result = results[0]
+                    school_link = result.get_attribute('href')
+        
+                    if school_link:
+                        with lock:
+                            result_queue.append((school_name, school_link))
+                            save_school_links(result_queue)
+                            saved_links[school_name] = school_link
+                    
+                    else:
+                        print('No link found')
             
             except Exception as e:
                 print(f"Error in inner loop for {i}: {school_name} {state} : {e}")
