@@ -14,7 +14,7 @@ import urllib.parse
 
 lock = threading.Lock()
 active_threads = []
-max_threads = 3
+max_threads = 2
 
 ## extracts roughly 118k school and state pairs from dados2 file
 def process_csvs(folder_path):
