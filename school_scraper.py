@@ -1,24 +1,25 @@
-import time
-import random
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.common.proxy import Proxy, ProxyType
-from selenium.webdriver.common.action_chains import ActionChains
 import os
 import pandas as pd
 from fake_useragent import UserAgent
-from dotenv import load_dotenv
+import threading
+import concurrent.futures
+from collections import deque
+import urllib.parse
 
-
+lock = threading.Lock()
+active_threads = []
+max_threads = 2
 
 ## extracts roughly 118k school and state pairs from dados2 file
 def process_csvs(folder_path):
     count = 0
-    school_tuples = []
+    school_tuples = deque()
     seen_tuples = set()
     for file in os.listdir(folder_path):
         file_path = os.path.join(folder_path, file)
@@ -51,72 +52,107 @@ def process_csvs(folder_path):
 
     return school_tuples
 
+
 ## loads the .csv file created by the process_csvs function, if it exists
 def load_school_tuples(file_path='school_tuples.csv'): 
     if os.path.exists(file_path):
         df = pd.read_csv(file_path)
-        school_tuples = list(df.itertuples(index=False, name=None))
+        school_tuples = deque(df.itertuples(index=False, name=None))
         return school_tuples
     else:
         print(f"No saved school tuples found at {file_path}")
         return None
 
+## loads the csv file created by the get_school_links function, if it exists
+def load_school_links(file_path='school_links.csv'): 
+    if os.path.exists(file_path):
+        df = pd.read_csv(file_path)
+        saved_links = {row['School Name']: row['School Link'] for _, row in df.iterrows()}
+        return saved_links
+    else:
+        print(f"No saved school links found at {file_path}")
+        return {}
+
 ## uses a webdriver and the list of school, state pairs to obtain the school website links
-def get_school_links(school_tuples, saved_links):
+def get_school_links(school_tuples, saved_links, result_queue, position, i):
+    try:
+        driver = wbdvr_maker(position, i)
+        while school_tuples:
+            with lock:
+                if not school_tuples:
+                    break
+                school_tuple = school_tuples.popleft()
 
-    new_links = []
-    driver = wbdvr_maker()
-    i = 0
-
-    for school_name, state in school_tuples:
-
-        if school_name in saved_links:
-            continue
-        
-
-        q = f"{school_name} {state} website"
-        url = f"https://www.google.com/search?q={q.replace(' ', '+')}"
-        print(f"Following link: {url}")
-        driver.get(url)
-
-        if check_for_captcha(driver) == True:
-            time.sleep(30)
+            school_name, state = school_tuple
             
-        try:
-            wait = WebDriverWait(driver, 10)
-            results = wait.until(EC.presence_of_all_elements_located((By.XPATH, '//div[@class="yuRUbf"]//a')))
-            result = results[0]
-            school_link = result.get_attribute('href')
-            new_links.append((school_name, school_link))
-            saved_links[school_name] = school_link
-            i += 1
+            with lock:
+                    if school_name in saved_links:
+                        continue
+
+            q = f"{school_name} {state} website"
+            parsed_q = urllib.parse.quote(q)
+            url = f"https://www.google.com/search?q={parsed_q}"
+            print(f"Thread {threading.current_thread().name} is working on {school_tuple}. Link: {url}\n")
+            driver.get(url)
+
+            if check_for_captcha(driver):
+                input(f"Press Enter to continue for {i}\n")
+
+            try:
+                wait = WebDriverWait(driver, 10)
+                xpaths = '//div[@class="yuRUbf"]//a | //div[@class="P8ujBc v5yQqb jqWpsc"]//a'
+                
+                results = wait.until(EC.presence_of_all_elements_located((By.XPATH, xpaths)))
+
+                if results:
+                    result = results[0]
+                    school_link = result.get_attribute('href')
         
-        except Exception as e:
-            print(f"Error for {school_name} {state}: {e}")
-            i += 1
-            continue
-
-
-        save_school_links(new_links)
-       # time.sleep(40)
-
+                    if school_link:
+                        with lock:
+                            result_queue.append((school_name, school_link))
+                            save_school_links(result_queue)
+                            saved_links[school_name] = school_link
+                    
+                    else:
+                        print('No link found')
+            
+            except Exception as e:
+                print(f"Error in inner loop for {i}: {school_name} {state} : {e}")
+                driver.quit()
+                driver = wbdvr_maker(position, i)
+            
+    except Exception as e:
+        print(f"Error in outer loop for {i}: {school_name} {state} : {e}")
+      
+        driver.quit()
+        return
+        
     driver.quit()
-    return new_links
+    return
 
-## makes new webdriver to avoid captcha
-def wbdvr_maker():
-    ua = UserAgent()
-    user_agent = ua.random
-    options = webdriver.ChromeOptions()
-    options.add_argument(f'user-agent={user_agent}')
-    # options.add_argument('--headless')
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    return driver
+## makes webdriver
+def wbdvr_maker(position, i,  size=(800, 600)):
+    try:
+        ua = UserAgent()
+        user_agent = ua.random
+        options = webdriver.ChromeOptions()
+        options.add_argument(f'user-agent={user_agent}')
+        # options.add_argument('--headless')
+        options.add_argument(f'--window-position={position[0]},{position[1]}')
+        options.add_argument(f'--window-size={size[0]},{size[1]}')
+        driver_path = '/Users/johnreinker/.wdm/drivers/chromedriver/mac64/126.0.6478.127/chromedriver-mac-x64/chromedriver'
+        if not os.path.exists(driver_path):
+            print(f"Downloading latest CD version")
+            driver_path = ChromeDriverManager().install()
+        driver = webdriver.Chrome(service=Service(driver_path), options=options)
+        return driver
+    except Exception as e:
+        print(f"Error making WD for {i}: {e}")
 
 def check_for_captcha(driver):
     current_url = driver.current_url
     if "sorry/index?continue" in current_url:
-        print(f"Captcha encountered")
         return True
     else:
         return False
@@ -130,19 +166,7 @@ def save_school_links(school_links, file_path='school_links.csv'):
     df_links.to_csv(file_path, index=False)
 
 
-## loads the csv file created by the get_school_links function, if it exists
-def load_school_links(file_path='school_links.csv'): 
-    if os.path.exists(file_path):
-        df = pd.read_csv(file_path)
-        saved_links = {row['School Name']: row['School Link'] for _, row in df.iterrows()}
-        return saved_links
-    else:
-        print(f"No saved school links found at {file_path}")
-        return {}
-
-
 def main():
-    
     ## where the dados2 file is located on the machine
     folder_path = '/Users/johnreinker/Desktop/dados2'
 
@@ -154,8 +178,20 @@ def main():
     ## school_tuples = [('Saint Louis Priory School', 'Missouri'), ('St. Ignatius College Preparatory', 'California'), ('Crespi Carmelite', 'California')]
     ## checks for school links csv, if it does not exist, calls get_school_links
     saved_links = load_school_links()
-    new_links = get_school_links(school_tuples, saved_links)
+    result_queue = []
+    positions = [(0,0), (800,0),(0,600), (800,600)]
 
+    ## sets up max_threads for parallel work, creates a new thread if one goes down
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
+        while school_tuples:
+            with lock:
+                if len(active_threads) < max_threads:
+                    print(active_threads)
+                    for i in range(max_threads):
+                        if i not in active_threads:
+                            active_threads.append(i)
+                            executor.submit(get_school_links, school_tuples, saved_links, result_queue, positions[i], i)
+    return
 
 if __name__ == "__main__":
     main()
