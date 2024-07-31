@@ -95,7 +95,7 @@ def get_school_links(school_tuples, saved_links, result_queue, position, id):
             driver.get(url)
 
             if check_for_captcha(driver):
-                input(f"Press Enter to continue for {i}\n")
+                input(f"Press Enter to continue for {id}\n")
 
             try:
                 wait = WebDriverWait(driver, 10)
