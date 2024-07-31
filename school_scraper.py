@@ -12,6 +12,7 @@ import concurrent.futures
 from collections import deque
 import urllib.parse
 
+## globals
 lock = threading.Lock()
 active_threads = []
 max_threads = 4
@@ -49,9 +50,7 @@ def process_csvs(folder_path):
     ## saves the 118k tuples to a csv file so we don't have to rerun this whole function
     df_tuples = pd.DataFrame(school_tuples, columns=['School Name', 'State'])
     df_tuples.to_csv('school_tuples.csv', index=False)
-
     return school_tuples
-
 
 ## loads the .csv file created by the process_csvs function, if it exists
 def load_school_tuples(file_path='school_tuples.csv'): 
@@ -74,9 +73,9 @@ def load_school_links(file_path='school_links.csv'):
         return {}
 
 ## uses a webdriver and the list of school, state pairs to obtain the school website links
-def get_school_links(school_tuples, saved_links, result_queue, position, i):
+def get_school_links(school_tuples, saved_links, result_queue, position, id):
     try:
-        driver = wbdvr_maker(position, i)
+        driver = wbdvr_maker(position, id)
         while school_tuples:
             with lock:
                 if not school_tuples:
@@ -118,13 +117,12 @@ def get_school_links(school_tuples, saved_links, result_queue, position, i):
                         print('No link found')
             
             except Exception as e:
-                print(f"Error in inner loop for {i}: {school_name} {state} : {e}")
+                print(f"Error in inner loop for {id}: {school_name} {state} : {e}")
                 driver.quit()
-                driver = wbdvr_maker(position, i)
+                driver = wbdvr_maker(position, id)
             
     except Exception as e:
-        print(f"Error in outer loop for {i}: {school_name} {state} : {e}")
-      
+        print(f"Error in outer loop for {id}: {school_name} {state} : {e}")
         driver.quit()
         return
         
@@ -132,7 +130,7 @@ def get_school_links(school_tuples, saved_links, result_queue, position, i):
     return
 
 ## makes webdriver
-def wbdvr_maker(position, i,  size=(800, 600)):
+def wbdvr_maker(position, id,  size=(800, 600)):
     try:
         ua = UserAgent()
         user_agent = ua.random
@@ -148,7 +146,7 @@ def wbdvr_maker(position, i,  size=(800, 600)):
         driver = webdriver.Chrome(service=Service(driver_path), options=options)
         return driver
     except Exception as e:
-        print(f"Error making WD for {i}: {e}")
+        print(f"Error making WD for {id}: {e}")
 
 def check_for_captcha(driver):
     current_url = driver.current_url
@@ -164,7 +162,6 @@ def save_school_links(school_links, file_path='school_links.csv'):
         df_existing = pd.read_csv(file_path)
         df_links = pd.concat([df_existing, df_links]).drop_duplicates(subset=['School Name']).reset_index(drop=True)
     df_links.to_csv(file_path, index=False)
-
 
 def main():
     ## where the dados2 file is located on the machine
@@ -186,11 +183,10 @@ def main():
         while school_tuples:
             with lock:
                 if len(active_threads) < max_threads:
-                    print(active_threads)
-                    for i in range(max_threads):
-                        if i not in active_threads:
-                            active_threads.append(i)
-                            executor.submit(get_school_links, school_tuples, saved_links, result_queue, positions[i], i)
+                    for id in range(max_threads):
+                        if id not in active_threads:
+                            active_threads.append(id)
+                            executor.submit(get_school_links, school_tuples, saved_links, result_queue, positions[id], id)
     return
 
 if __name__ == "__main__":
