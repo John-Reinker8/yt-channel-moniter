@@ -66,7 +66,7 @@ def load_school_tuples(file_path='school_tuples.csv'):
 def load_school_links(file_path='school_links.csv'): 
     if os.path.exists(file_path):
         df = pd.read_csv(file_path)
-        saved_links = {row['School Name']: row['School Link'] for _, row in df.iterrows()}
+        saved_links = {(row['School Name'], row['State']): row['School Link'] for _, row in df.iterrows()}
         return saved_links
     else:
         print(f"No saved school links found at {file_path}")
@@ -85,7 +85,7 @@ def get_school_links(school_tuples, saved_links, result_queue, position, id):
             school_name, state = school_tuple
             
             with lock:
-                    if school_name in saved_links:
+                    if (school_name, state) in saved_links:
                         continue
 
             q = f"{school_name} {state} website"
@@ -109,9 +109,9 @@ def get_school_links(school_tuples, saved_links, result_queue, position, id):
         
                     if school_link:
                         with lock:
-                            result_queue.append((school_name, school_link))
+                            result_queue.append((school_name, state, school_link))
                             save_school_links(result_queue)
-                            saved_links[school_name] = school_link
+                            saved_links[(school_name, state)] = school_link
                     
                     else:
                         print('No link found')
@@ -157,10 +157,10 @@ def check_for_captcha(driver):
 
 ## iteratively saves the school links to the school links csv file as the code works
 def save_school_links(school_links, file_path='school_links.csv'):
-    df_links = pd.DataFrame(school_links, columns=['School Name', 'School Link'])
+    df_links = pd.DataFrame(school_links, columns=['School Name', 'State', 'School Link'])
     if os.path.exists(file_path):
         df_existing = pd.read_csv(file_path)
-        df_links = pd.concat([df_existing, df_links]).drop_duplicates(subset=['School Name']).reset_index(drop=True)
+        df_links = pd.concat([df_existing, df_links]).drop_duplicates(subset=['School Name', 'State']).reset_index(drop=True)
     df_links.to_csv(file_path, index=False)
 
 def main():
