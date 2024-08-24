@@ -139,10 +139,7 @@ def wbdvr_maker(position, id,  size=(800, 600)):
         # options.add_argument('--headless')
         options.add_argument(f'--window-position={position[0]},{position[1]}')
         options.add_argument(f'--window-size={size[0]},{size[1]}')
-        driver_path = '/Users/johnreinker/.wdm/drivers/chromedriver/mac64/126.0.6478.127/chromedriver-mac-x64/chromedriver'
-        if not os.path.exists(driver_path):
-            print(f"Downloading latest CD version")
-            driver_path = ChromeDriverManager().install()
+        driver_path = '/Users/johnreinker/.wdm/drivers/chromedriver/mac64/128.0.6613.84/chromedriver-mac-x64/chromedriver'
         driver = webdriver.Chrome(service=Service(driver_path), options=options)
         return driver
     except Exception as e:
@@ -164,6 +161,9 @@ def save_school_links(school_links, file_path='school_links.csv'):
     df_links.to_csv(file_path, index=False)
 
 def main():
+    ## if a new version of chromedriver is needed, uncomment and run the following line after deleting the old driver version:
+    ##ChromeDriverManager().install()
+
     ## where the dados2 file is located on the machine
     folder_path = '/Users/johnreinker/Desktop/dados2'
 
