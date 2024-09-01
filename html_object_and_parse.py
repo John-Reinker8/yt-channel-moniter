@@ -49,18 +49,29 @@ def html_getter(school_links, links_done):
         if link in links_done:
             continue
 
+        skip_domains = ['usnews.com', 'yelp.com', 'niche.com']
+        if any(domain in link for domain in skip_domains):
+            print(f"Skip {link}")
+            save_media(name, state, link, youtube_link="", twitter_link="" , instagram_link="", facebook_link="")
+            continue
+
+        if 'facebook.com' in link:
+            print(f"Skip fb {link}")
+            save_media(name, state, link, youtube_link="", twitter_link="" , instagram_link="", facebook_link=link)
+            continue
+
         print(f"Fetching html for: {link}")
         try:
             response = requests.get(link)
             response.raise_for_status()
             if response.text:
-
                 youtube_link, twitter_link, instagram_link, facebook_link = html_parser(response.text)
                 save_media(name, state, link, youtube_link, twitter_link, instagram_link, facebook_link)
 
         except requests.RequestException as e:
             print(f"Error fetching html contents for {link}: {e}")
-        
+            save_media(name, state, link, youtube_link="", twitter_link="" , instagram_link="", facebook_link="")
+
     return
 
 ## parses the html objects obtained from html_getter, looking for youtube links
@@ -70,25 +81,39 @@ def html_parser(html_contents):
     instagram_link = ""
     facebook_link = ""
     soup = BeautifulSoup(html_contents, 'html.parser')
-    
+    base_urls = {
+        "https://youtube.com", "http://youtube.com", 
+        "https://www.youtube.com", "http://www.youtube.com",
+        "https://twitter.com", "http://twitter.com", 
+        "https://www.twitter.com", "http://www.twitter.com",
+        "https://x.com", "http://x.com", 
+        "https://www.x.com", "http://www.x.com",
+        "https://instagram.com", "http://instagram.com", 
+        "https://www.instagram.com", "http://www.instagram.com",
+        "https://facebook.com", "http://facebook.com", 
+        "https://www.facebook.com", "http://www.facebook.com",
+        "https://wix.com", "http://wix.com", 
+        "https://www.wix.com", "http://www.wix.com",
+    }
+
     for tag in soup.find_all('a', href=True):
         href_content = tag['href']
 
         if "youtube.com" in href_content:
-            youtube_link = href_content
+           if href_content.rstrip('/') not in base_urls:
+                youtube_link = href_content
     
         if "x.com" in href_content or "twitter.com" in href_content:
-            if href_content != "http://wix.com":
+            if href_content.rstrip('/') not in base_urls:
                 twitter_link = href_content
-
-      ##  elif "twitter.com" in href_content:
-       ##     twitter_link = href_content
         
         if "instagram.com" in href_content:
-            instagram_link = href_content
+            if href_content.rstrip('/') not in base_urls:
+                instagram_link = href_content
     
         if "facebook.com" in href_content:
-            facebook_link = href_content
+            if href_content.rstrip('/') not in base_urls:
+                facebook_link = href_content
             
     return youtube_link, twitter_link, instagram_link, facebook_link
 
@@ -98,7 +123,7 @@ def main():
     school_links = load_school_links()
     links_done = load_media()
    
-    test_links = school_links[0:19]
+    test_links = school_links[54:62]
     html_getter(test_links, links_done)
 
     end = time.time()
