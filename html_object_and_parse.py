@@ -24,6 +24,7 @@ def load_media(file_path='school_medias.csv'):
         print(f"No done school links found at {file_path}")
         return set()
 
+## save the media links to the output file
 def save_media(name, state, link, youtube_link, twitter_link, instagram_link, facebook_link, output_file='school_medias.csv'):
     data = {
         'School Name': [name],
@@ -53,6 +54,7 @@ def html_getter(school_links, links_done):
             response = requests.get(link)
             response.raise_for_status()
             if response.text:
+
                 youtube_link, twitter_link, instagram_link, facebook_link = html_parser(response.text)
                 save_media(name, state, link, youtube_link, twitter_link, instagram_link, facebook_link)
 
@@ -67,26 +69,26 @@ def html_parser(html_contents):
     twitter_link = ""
     instagram_link = ""
     facebook_link = ""
+    soup = BeautifulSoup(html_contents, 'html.parser')
     
-    for h in html_contents:
-        soup = BeautifulSoup(h, 'html.parser')
+    for tag in soup.find_all('a', href=True):
+        href_content = tag['href']
 
-        for tag in soup.find_all('a', href=True):
-            href_content = tag['href']
+        if "youtube.com" in href_content:
+            youtube_link = href_content
+    
+        if "x.com" in href_content or "twitter.com" in href_content:
+            if href_content != "http://wix.com":
+                twitter_link = href_content
 
-            if "youtube.com" in href_content:
-                youtube_link = href_content
+      ##  elif "twitter.com" in href_content:
+       ##     twitter_link = href_content
         
-            if "x.com" in href_content:
-                twitter_link = href_content
-            elif "twitter.com" in href_content:
-                twitter_link = href_content
-         
-            if "instagram.com" in href_content:
-                instagram_link = href_content
-       
-            if "facebook.com" in href_content:
-                facebook_link = href_content
+        if "instagram.com" in href_content:
+            instagram_link = href_content
+    
+        if "facebook.com" in href_content:
+            facebook_link = href_content
             
     return youtube_link, twitter_link, instagram_link, facebook_link
 
@@ -96,10 +98,8 @@ def main():
     school_links = load_school_links()
     links_done = load_media()
    
-    test_links = school_links[0:5]
-    
+    test_links = school_links[0:19]
     html_getter(test_links, links_done)
-
 
     end = time.time()
     print(f"It took {end - start} sec to complete.")
