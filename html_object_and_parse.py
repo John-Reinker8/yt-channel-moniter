@@ -123,8 +123,7 @@ def main():
     school_links = load_school_links()
     links_done = load_media()
    
-    test_links = school_links[54:62]
-    html_getter(test_links, links_done)
+    html_getter(school_links, links_done)
 
     end = time.time()
     print(f"It took {end - start} sec to complete.")
