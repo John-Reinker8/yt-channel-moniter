@@ -94,6 +94,9 @@ def html_parser(html_contents):
         "https://www.facebook.com", "http://www.facebook.com",
         "https://wix.com", "http://wix.com", 
         "https://www.wix.com", "http://www.wix.com",
+        "//twitter.com", "//instagram.com",
+        "//youtube.com", "//facebook.com",
+        "//x.com",
     }
 
     for tag in soup.find_all('a', href=True):
