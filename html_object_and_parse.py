@@ -67,6 +67,8 @@ def html_getter(school_links, links_done):
             if response.text:
                 youtube_link, twitter_link, instagram_link, facebook_link = html_parser(response.text)
                 save_media(name, state, link, youtube_link, twitter_link, instagram_link, facebook_link)
+            else:
+                save_media(name, state, link='bad link', youtube_link="", twitter_link="" , instagram_link="", facebook_link="")
 
         except requests.RequestException as e:
             print(f"Error fetching html contents for {link}: {e}")
