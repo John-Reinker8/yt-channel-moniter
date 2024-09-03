@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+import re
 
 ## load the school website links csv created by school_scrapper.py
 def load_school_links(file_path='school_links.csv'):
@@ -60,15 +61,20 @@ def html_getter(school_links, links_done):
             save_media(name, state, link, youtube_link="", twitter_link="" , instagram_link="", facebook_link=link)
             continue
 
+        if link.lower().endswith('.pdf'):
+            print(f"Skip non-HTML file link: {link}")
+            save_media(name, state, link, youtube_link="", twitter_link="", instagram_link="", facebook_link="")
+            continue
+
         print(f"Fetching html for: {link}")
         try:
-            response = requests.get(link)
+            response = requests.get(link, timeout=20)
             response.raise_for_status()
             if response.text:
                 youtube_link, twitter_link, instagram_link, facebook_link = html_parser(response.text)
                 save_media(name, state, link, youtube_link, twitter_link, instagram_link, facebook_link)
             else:
-                save_media(name, state, link='bad link', youtube_link="", twitter_link="" , instagram_link="", facebook_link="")
+                save_media(name, state, link, youtube_link="", twitter_link="" , instagram_link="", facebook_link="")
 
         except requests.RequestException as e:
             print(f"Error fetching html contents for {link}: {e}")
@@ -108,7 +114,10 @@ def html_parser(html_contents):
            if href_content.rstrip('/') not in base_urls:
                 youtube_link = href_content
     
-        if "x.com" in href_content or "twitter.com" in href_content:
+        if "x.com" in href_content and re.match(r'^(https?://)?(www\.)?x\.com(/.*)?$', href_content):
+            if href_content.rstrip('/') not in base_urls:
+                twitter_link = href_content
+        elif "twitter.com" in href_content:
             if href_content.rstrip('/') not in base_urls:
                 twitter_link = href_content
         
